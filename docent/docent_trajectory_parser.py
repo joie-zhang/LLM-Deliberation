@@ -128,9 +128,10 @@ class TrajectoryParser:
         docent_runs.append(run)
         return docent_runs
     
-    def process_all_trajectories(self) -> List[Dict[str, Any]]:
+    def process_all_trajectories(self) -> tuple[List[Dict[str, Any]], List[Path]]:
         """Process all trajectory files in the data directory"""
         all_runs = []
+        processed_files = []
         
         # Find all JSON files (trajectory files)
         json_files = list(self.data_dir.glob("history*.json"))
@@ -143,12 +144,13 @@ class TrajectoryParser:
                 parsed_data = self.parse_trajectory_file(str(json_file))
                 docent_runs = self.convert_to_docent_format(parsed_data)
                 all_runs.extend(docent_runs)
+                processed_files.append(json_file)
                 print(f"Successfully processed {json_file.name} - {len(docent_runs)} runs")
             except Exception as e:
                 print(f"Error processing {json_file.name}: {e}")
         
         print(f"Total runs prepared for Docent: {len(all_runs)}")
-        return all_runs
+        return all_runs, processed_files
 
 def main():
     """Main execution function"""
@@ -158,15 +160,26 @@ def main():
     parser = TrajectoryParser(data_dir)
     
     # Process all trajectory files
-    docent_runs = parser.process_all_trajectories()
+    docent_runs, processed_files = parser.process_all_trajectories()
     
     # Save processed data for inspection
-    output_file = "docent_prepared_data.json"
+    output_file = Path(__file__).parent / "docent_prepared_data.json"
     with open(output_file, 'w') as f:
         json.dump(docent_runs, f, indent=2)
     
     print(f"Processed data saved to {output_file}")
     print(f"Ready for Docent ingestion: {len(docent_runs)} runs")
+    
+    # Move processed files to prevent re-processing
+    if processed_files:
+        processed_dir = Path(data_dir) / "processed"
+        processed_dir.mkdir(exist_ok=True)
+        print(f"\nMoving {len(processed_files)} processed files to {processed_dir}...")
+        
+        for json_file in processed_files:
+            destination = processed_dir / json_file.name
+            json_file.rename(destination)
+            print(f"Moved {json_file.name} to processed/")
     
     # Print summary statistics
     print("\n=== Summary Statistics ===")
